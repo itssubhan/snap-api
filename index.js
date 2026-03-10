@@ -4,41 +4,86 @@ const ytdlp = require("yt-dlp-exec");
 
 const app = express();
 app.use(cors());
+
 const PORT = process.env.PORT || 3000;
 
-app.get("/", (req,res) => res.send("SnapTube jesi API Running"));
+app.get("/", (req,res)=>{
+  res.send("Advanced Video Downloader API Running");
+});
 
-app.get("/info", async (req,res) => {
-  const url = decodeURIComponent(req.query.url || "");
-  if(!url) return res.json({error:"URL required"});
-  
+app.get("/info", async (req,res)=>{
+  const url = req.query.url;
+
+  if(!url){
+    return res.json({error:"URL required"});
+  }
+
   try{
-    const info = await ytdlp(url, {dumpSingleJson:true, noWarnings:true});
+
+    const info = await ytdlp(url,{
+      dumpSingleJson:true,
+      noWarnings:true,
+      preferFreeFormats:true
+    });
+
     res.json({
       title: info.title,
       thumbnail: info.thumbnail,
       duration: info.duration,
+      uploader: info.uploader,
+      platform: info.extractor,
       formats: info.formats
+        .filter(f=>f.ext==="mp4")
+        .map(f=>({
+          quality:f.format_note || f.height+"p",
+          url:f.url
+        }))
     });
-  }catch(err){
-    res.json({error:"Video fetch failed", details: err.message});
+
+  }catch(e){
+
+    res.json({
+      error:"Video fetch failed",
+      message:e.message
+    });
+
   }
+
 });
 
-app.get("/download", async (req,res) => {
-  const url = decodeURIComponent(req.query.url || "");
-  if(!url) return res.json({error:"URL required"});
-  
+app.get("/download", async (req,res)=>{
+  const url = req.query.url;
+
+  if(!url){
+    return res.json({error:"URL required"});
+  }
+
   try{
-    const info = await ytdlp(url, {dumpSingleJson:true, noWarnings:true});
-    const best = info.formats.reverse().find(f=>f.url);
+
+    const info = await ytdlp(url,{
+      dumpSingleJson:true,
+      noWarnings:true
+    });
+
+    const format = info.formats.reverse().find(f=>f.ext==="mp4");
+
     res.json({
       title: info.title,
-      download: best ? best.url : null
+      thumbnail: info.thumbnail,
+      download: format ? format.url : null
     });
-  }catch(err){
-    res.json({error:"Download failed", details: err.message});
+
+  }catch(e){
+
+    res.json({
+      error:"Download failed",
+      message:e.message
+    });
+
   }
+
 });
 
-app.listen(PORT, () => console.log(`API running on port ${PORT}`));
+app.listen(PORT,()=>{
+  console.log("Server running on port "+PORT);
+});
